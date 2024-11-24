@@ -1,69 +1,63 @@
 from flask import Flask, request
 import os
-import openai  # Убедись, что библиотека openai установлена: pip install openai
+import openai
+import requests
 
 app = Flask(__name__)
 
-# Устанавливаем токен подтверждения для верификации
-VERIFY_TOKEN = "mywhatsappwebhooktokenmega"  # Токен подтверждения, который ты указал
-OPENAI_API_KEY = "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"  # Замените на свой API-ключ OpenAI
-
-# Настройка OpenAI
-openai.api_key = OPENAI_API_KEY
+# Устанавливаем токен подтверждения и токен доступа
+VERIFY_TOKEN = "mywhatsappwebhooktokenmega"  # Токен подтверждения
+ACCESS_TOKEN = "EAAIFtjwHax4BOZCKrNNxsGPQa1em7dmKaZBiS11ZAGQ7yyrvCFZA2KcJEAo8CnwOUQmFCCpb0HxOy4huVnN1zt8H7QkbN9XTdkYRjS81ZBFZC31nTlywPEAuArKAEdEbTPxVNu14O0IybK67dH8wwxTMVAEoe7ZA4ideS4A1vQXLZALX2yK9jZAZABovn2ZANOXZCCZB5z8ZAg280c4TYXWuO90tKZCZBC4brFjrvreKGE4ZARsUKFU0ZD"
+# Подключение OpenAI API
+openai.api_key = "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"
 
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
-    # Верификация запроса от WhatsApp
     if request.method == 'GET':
+        # Верификация запроса от WhatsApp
         challenge = request.args.get('hub.challenge')
         token = request.args.get('hub.verify_token')
-
         if token == VERIFY_TOKEN:
             return challenge, 200
         else:
             return 'Invalid verification token', 403
 
-    # Обработка входящих сообщений (POST запросы от WhatsApp)
     if request.method == 'POST':
-        data = request.json  # Получаем данные от WhatsApp
-        print("Получено сообщение:", data)
+        # Получение данных от WhatsApp
+        data = request.json
+        if data and "messages" in data["entry"][0]["changes"][0]["value"]:
+            message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+            sender = message["from"]  # ID отправителя
+            text = message.get("text", {}).get("body", "")  # Текст сообщения
 
-        # Проверяем, есть ли сообщение от пользователя
-        if 'entry' in data:
-            for entry in data['entry']:
-                if 'changes' in entry:
-                    for change in entry['changes']:
-                        value = change.get('value')
-                        if value:
-                            messages = value.get('messages')
-                            if messages:
-                                for message in messages:
-                                    phone_number = message['from']  # Номер отправителя
-                                    text = message['text']['body']  # Текст сообщения
+            # Отправляем запрос в OpenAI
+            if text:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",  # Укажи модель
+                    messages=[{"role": "user", "content": text}]
+                )
+                answer = response["choices"][0]["message"]["content"]
 
-                                    # Получаем ответ от OpenAI
-                                    response = get_openai_response(text)
-
-                                    # Здесь можно будет отправить ответ обратно в WhatsApp
-                                    print(f"Ответ от OpenAI для {phone_number}: {response}")
+                # Отправляем ответ обратно в WhatsApp
+                send_message(sender, answer)
 
         return "OK", 200
 
-# Функция для отправки запроса в OpenAI и получения ответа
-def get_openai_response(user_input):
-    try:
-        completion = openai.Completion.create(
-            engine="text-davinci-003",  # Используемый движок (замени на нужный)
-            prompt=user_input,
-            max_tokens=150,  # Максимальное количество токенов в ответе
-            n=1,
-            stop=None,
-            temperature=0.7,  # Контролирует "креативность" ответа
-        )
-        return completion.choices[0].text.strip()  # Возвращаем текст ответа
-    except Exception as e:
-        print(f"Ошибка при запросе к OpenAI: {e}")
-        return "Произошла ошибка при обработке запроса. Попробуйте снова."
+def send_message(recipient, text):
+    """Функция отправки сообщения в WhatsApp."""
+    url = f"https://graph.facebook.com/v17.0/ВАШ_ID_ТЕЛЕФОНА/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "text",
+        "text": {"body": text}
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("Ответ WhatsApp:", response.status_code, response.text)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
