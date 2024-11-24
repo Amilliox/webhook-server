@@ -45,7 +45,7 @@ def webhook():
 
 def send_message(recipient, text):
     """Функция отправки сообщения в WhatsApp."""
-    url = f"https://graph.facebook.com/v17.0/ВАШ_ID_ТЕЛЕФОНА/messages"
+    url = f"https://graph.facebook.com/v17.0/456763200861670/messages"  # Здесь используется ваш ID телефона
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
