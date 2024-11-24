@@ -1,4 +1,5 @@
 from flask import Flask, request
+import os
 
 app = Flask(__name__)
 
@@ -9,5 +10,6 @@ def webhook():
     return "OK", 200  # Отвечаем WhatsApp API, что запрос обработан успешно
 
 if __name__ == '__main__':
-    # Убираем app.run() для продакшн-режима, так как Render автоматически настроит сервер
-    pass
+    # Используем переменную окружения для порта
+    port = int(os.environ.get("PORT", 5000))  # Используем 5000 по умолчанию для локальной разработки
+    app.run(host='0.0.0.0', port=port)  # Flask будет слушать на правильном порту
